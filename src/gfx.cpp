@@ -9,3 +9,6 @@
 
 #define CLAY_MATH_IMPLEMENTATION
 #include "clay_math.hpp"
+
+#define CLAY_GFX_IMPLEMENTATION
+#include "clay_gfx.hpp"

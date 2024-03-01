@@ -1,107 +1,108 @@
-#define CLAY_WINDOW_HEIGHT 630
-#define CLAY_WINDOW_WIDTH 1350
+#define CLAY_WINDOW_HEIGHT 1350
+#define CLAY_WINDOW_WIDTH 630
+
+#ifdef __ANDROID__
+#define CLAY_PLATFORM_ANDROID
+#include <game-activity/native_app_glue/android_native_app_glue.h>
+#include <EGL/egl.h>
+#include <GLES3/gl3.h>
+#include <sensors.h>
+#else
+#define CLAY_PLATFORM_DESKTOP
+#include <glad/glad.h>
+#include <GL/gl.h>
+#endif
+
+#include "clay_math.hpp"
+#include "clay_gfx.hpp"
+#include "clay.hpp"
 
 #include <vector>
 #include <memory>
 
-void start(void *window);
-void loop(void *window);
-
-#ifdef __ANDROID__
-#include "main_android.cc"
-#else
-#include "main_desktop.cc"
-#endif
-
-#include "clay_math.hpp"
-
-#ifdef CLAY_PLATFORM_ANDROID
-#include <EGL/egl.h>
-#include <GLES3/gl3.h>
-#else
-#include <glad/glad.h>
-#include <GL/gl.h>
-#endif // CLAY_PLATFORM_ANDROID
-
-std::unique_ptr<gfx::Pipeline> pipeline;
-gfx::Attribute vertex, color;
-std::vector<float> vertices = {
-    -0.5, -0.5, 0.0,
-    0.0, 0.5, 0.0,
-    0.5, -0.5, 0.0};
-std::vector<float> colors = {
-    1.0, 0.0, 0.0,
-    0.0, 1.0, 0.0,
-    0.0, 0.0, 1.0};
-std::vector<uint32_t> indices = {
-    0, 1, 2};
-gfx::Uniform uniform_proj;
-
-void start(void *window)
+class App
 {
-    clay::Window *win = (clay::Window *)window;
+public:
+    bool is_running = true;
+    clay::Window *window;
+    std::unique_ptr<gfx::Pipeline> pipeline;
+    std::vector<float> vertices = {
+        -0.5, -0.5, 0.0,
+        0.0, 0.5, 0.0,
+        0.5, -0.5, 0.0};
+    std::vector<float> colors = {
+        1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0};
+    gfx::Uniform uniform_proj;
+    gfx::VertexArray *vao;
+    gfx::Buffer *vbo;
+    gfx::Buffer *cbo;
 
-    gfx::ShaderModule vertex_shader(gfx::ShaderType::Vertex);
-    vertex_shader.set_source(R"(#version 300 es
-        in vec3 inPosition;
-        in vec3 inColor;
+    App(void *app)
+    {
+        window = clay::Window::create(CLAY_WINDOW_WIDTH, CLAY_WINDOW_HEIGHT, "Clay", app);
 
-        uniform mat4 proj;
+        gfx::ShaderModule vertex_shader(gfx::ShaderType::Vertex);
+        vertex_shader.set_source(R"(#version 300 es
+            layout(location=0) in vec3 inPosition;
+            layout(location=1) in vec3 inColor;
 
-        out vec3 fragColor;
+            uniform mat4 proj;
 
-        void main() {
-            fragColor = inColor;
-            gl_Position = proj * vec4(inPosition, 1.0);
-        }
-    )");
-    vertex_shader.compile();
+            out vec3 fragColor;
 
-    gfx::ShaderModule fragment_shader(gfx::ShaderType::Fragment);
-    fragment_shader.set_source(R"(#version 300 es
-        precision mediump float;
+            void main() {
+                fragColor = inColor;
+                gl_Position = proj * vec4(inPosition, 1.0);
+            }
+        )");
+        vertex_shader.compile();
 
-        out vec4 outColor;
+        gfx::ShaderModule fragment_shader(gfx::ShaderType::Fragment);
+        fragment_shader.set_source(R"(#version 300 es
+            precision mediump float;
 
-        in vec3 fragColor;
+            out vec4 outColor;
 
-        void main() {
-            outColor = vec4(fragColor, 1.0);
-        }
-    )");
-    fragment_shader.compile();
+            in vec3 fragColor;
 
-    pipeline = std::make_unique<gfx::Pipeline>();
-    pipeline->attach_shader(vertex_shader);
-    pipeline->attach_shader(fragment_shader);
-    pipeline->link();
+            void main() {
+                outColor = vec4(fragColor, 1.0);
+            }
+        )");
+        fragment_shader.compile();
 
-    vertex = pipeline->get_attribute("inPosition");
-    color = pipeline->get_attribute("inColor");
-    uniform_proj = pipeline->get_uniform("proj");
-}
+        pipeline = std::make_unique<gfx::Pipeline>();
+        pipeline->attach_shader(vertex_shader);
+        pipeline->attach_shader(fragment_shader);
+        pipeline->link();
 
-void loop(void *window)
-{
-    clay::Window *win = (clay::Window *)window;
+        uniform_proj = pipeline->get_uniform("proj");
 
-    glClearColor(0.0f, 0.0f, 0.3f, 1.0f);
+        vbo = new gfx::Buffer(gfx::BufferType::Array);
+        cbo = new gfx::Buffer(gfx::BufferType::Array);
+        vao = new gfx::VertexArray();
 
-    pipeline->use();
+        vbo->set_data(vertices.data(), vertices.size() * sizeof(float), gfx::BufferUsage::Static);
+        cbo->set_data(colors.data(), colors.size() * sizeof(float), gfx::BufferUsage::Static);
+        vao->set_attribute(0, *vbo, 3, gfx::DataType::Float, 0, 0);
+        vao->set_attribute(1, *cbo, 3, gfx::DataType::Float, 0, 0);
+    }
 
-    static float aspect = (float)win->height / (float)win->width;
-    static Mat4 proj = Mat4::ortho(1.0, -1.0, -aspect, aspect, 1.0f, -1.0f);
+    void update()
+    {
+        float aspect = (float)window->height / (float)window->width;
+        Mat4 proj = Mat4::ortho(1.0, -1.0, -aspect, aspect, 1.0f, -1.0f);
 
-    uniform_proj.set_mat4(&proj.data[0]);
+        pipeline->use();
+        uniform_proj.set_mat4(&proj.data[0]);
+        vao->bind();
+        gfx::draw(3);
 
-    vertex.enable();
-    vertex.set_pointer(vertices.data(), 3, 3 * sizeof(float));
+        window->update();
+        is_running = window->is_open();
+    }
+};
 
-    color.enable();
-    color.set_pointer(colors.data(), 3, 3 * sizeof(float));
-
-    glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, indices.data());
-
-    vertex.disable();
-    color.disable();
-}
+CLAY_RUN(App);

@@ -1,3 +1,21 @@
+//
+// This file is part of the "clay" project, and is released under the "MIT License".
+// See the LICENSE file for more information.
+// Created by Daril Rodriguez on 2024-03-01.
+//
+// clay_math.hpp - A simple math library for 2D, 3D, and 4D vectors, 4x4 matrices, and quaternions.
+//
+// Usage:
+// #define CLAY_MATH_IMPLEMENTATION
+// #include "clay_math.hpp"
+// #undef CLAY_MATH_IMPLEMENTATION
+//
+// #include "clay_math.hpp"
+//
+// Vec2 a = Vec2(1.0f, 2.0f);
+// Vec2 b = Vec2(3.0f, 4.0f);
+// Vec2 c = a + b;
+//
 #pragma once
 
 #include <cmath>
