@@ -1,6 +1,3 @@
-#define CLAY_WINDOW_HEIGHT 1350
-#define CLAY_WINDOW_WIDTH 630
-
 #ifdef __ANDROID__
 #define CLAY_PLATFORM_ANDROID
 #include <game-activity/native_app_glue/android_native_app_glue.h>
@@ -17,8 +14,13 @@
 #include "clay_gfx.hpp"
 #include "clay.hpp"
 
+#include "mesh.hpp"
+
 #include <vector>
 #include <memory>
+
+#define CLAY_WINDOW_WIDTH 800
+#define CLAY_WINDOW_HEIGHT 600
 
 class App
 {
@@ -26,18 +28,8 @@ public:
     bool is_running = true;
     clay::Window *window;
     std::unique_ptr<gfx::Pipeline> pipeline;
-    std::vector<float> vertices = {
-        -0.5, -0.5, 0.0,
-        0.0, 0.5, 0.0,
-        0.5, -0.5, 0.0};
-    std::vector<float> colors = {
-        1.0, 0.0, 0.0,
-        0.0, 1.0, 0.0,
-        0.0, 0.0, 1.0};
     gfx::Uniform uniform_proj;
-    gfx::VertexArray *vao;
-    gfx::Buffer *vbo;
-    gfx::Buffer *cbo;
+    Mesh *mesh;
 
     App(void *app)
     {
@@ -45,16 +37,13 @@ public:
 
         gfx::ShaderModule vertex_shader(gfx::ShaderType::Vertex);
         vertex_shader.set_source(R"(#version 300 es
-            layout(location=0) in vec3 inPosition;
-            layout(location=1) in vec3 inColor;
+            layout(location=0) in vec3 position;
+            layout(location=1) in vec3 uv;
 
             uniform mat4 proj;
 
-            out vec3 fragColor;
-
             void main() {
-                fragColor = inColor;
-                gl_Position = proj * vec4(inPosition, 1.0);
+                gl_Position = proj * vec4(position, 1.0);
             }
         )");
         vertex_shader.compile();
@@ -63,12 +52,10 @@ public:
         fragment_shader.set_source(R"(#version 300 es
             precision mediump float;
 
-            out vec4 outColor;
-
-            in vec3 fragColor;
+            out vec4 out_color;
 
             void main() {
-                outColor = vec4(fragColor, 1.0);
+                out_color = vec4(1.0, 1.0, 1.0, 1.0);
             }
         )");
         fragment_shader.compile();
@@ -80,14 +67,12 @@ public:
 
         uniform_proj = pipeline->get_uniform("proj");
 
-        vbo = new gfx::Buffer(gfx::BufferType::Array);
-        cbo = new gfx::Buffer(gfx::BufferType::Array);
-        vao = new gfx::VertexArray();
-
-        vbo->set_data(vertices.data(), vertices.size() * sizeof(float), gfx::BufferUsage::Static);
-        cbo->set_data(colors.data(), colors.size() * sizeof(float), gfx::BufferUsage::Static);
-        vao->set_attribute(0, *vbo, 3, gfx::DataType::Float, 0, 0);
-        vao->set_attribute(1, *cbo, 3, gfx::DataType::Float, 0, 0);
+        mesh = new Mesh({-0.5, -0.5, 0.0,
+                         0.0, 0.5, 0.0,
+                         0.5, -0.5, 0.0},
+                        {0.0, 0.0,
+                         0.5, 1.0,
+                         1.0, 0.0});
     }
 
     void update()
@@ -97,8 +82,8 @@ public:
 
         pipeline->use();
         uniform_proj.set_mat4(&proj.data[0]);
-        vao->bind();
-        gfx::draw(3);
+
+        mesh->draw();
 
         window->update();
         is_running = window->is_open();
